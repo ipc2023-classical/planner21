@@ -12,7 +12,7 @@ class State;
 namespace lp {
 class LinearProgram;
 class LPSolver;
-}
+}  // namespace lp
 
 namespace operator_counting {
 /*
@@ -41,6 +41,13 @@ public:
         const std::shared_ptr<AbstractTask> &task, lp::LinearProgram &lp);
 
     /*
+      This is a shortcut to prevent the calls of cache_heuristic, get_cached_heuristic_value and update_constraints to
+      do state dependent calculation while still dealing with the same state. Idealy the State object would have something like a StateID
+      that makes distinktion easy, but states loose their Id when they get transformed from ancestor tasks.
+    */
+    virtual void set_active_state(const State &state);
+
+    /*
       Called before evaluating a state. Use this to add temporary constraints
       and to set bounds on permanent constraints for this state. All temporary
       constraints are removed automatically after the evalution.
@@ -49,6 +56,16 @@ public:
     */
     virtual bool update_constraints(
         const State &state, lp::LPSolver &lp_solver) = 0;
+
+    /*
+      Signal to cache the heuristic computation if possible
+    */
+    virtual void cache_heuristic(const State &state, lp::LPSolver &lp_solver, double h);
+
+    /*
+      Called before evaluating a state to check if solving an LP is necessary.
+    */
+    virtual int get_cached_heuristic_value(const State &state);
 };
 }
 

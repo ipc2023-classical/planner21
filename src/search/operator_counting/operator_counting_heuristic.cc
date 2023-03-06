@@ -1,13 +1,11 @@
 #include "operator_counting_heuristic.h"
 
-#include "constraint_generator.h"
+#include <cmath>
 
 #include "../option_parser.h"
 #include "../plugin.h"
-
 #include "../utils/markup.h"
-
-#include <cmath>
+#include "constraint_generator.h"
 
 using namespace std;
 
@@ -17,7 +15,11 @@ OperatorCountingHeuristic::OperatorCountingHeuristic(const Options &opts)
       constraint_generators(
           opts.get_list<shared_ptr<ConstraintGenerator>>("constraint_generators")),
       lp_solver(opts.get<lp::LPSolverType>("lpsolver")),
-      use_integer_operator_counts(opts.get<bool>("use_integer_operator_counts")) {
+      cache_lp(opts.get<bool>("cache_lp")),
+      use_integer_operator_counts(opts.get<bool>("use_integer_operator_counts")),
+      debug_cache(opts.get<bool>("debug_cache")),
+      evaluations(0),
+      cache_hits(0) {
     lp_solver.set_mip_gap(0);
     named_vector::NamedVector<lp::LPVariable> variables;
     double infinity = lp_solver.get_infinity();
@@ -30,32 +32,67 @@ OperatorCountingHeuristic::OperatorCountingHeuristic(const Options &opts)
         generator->initialize_constraints(task, lp);
     }
     lp_solver.load_problem(lp);
+    if (cache_lp && constraint_generators.size() > 1) {
+        cerr << "lp_caching is not supported for more than ONE constraint generator" << endl;
+        utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+    }
 }
 
 OperatorCountingHeuristic::~OperatorCountingHeuristic() {
+    cout << "cache hits: " << cache_hits << endl;
+    assert(cache_hits <= evaluations);
 }
 
 int OperatorCountingHeuristic::compute_heuristic(const State &ancestor_state) {
+    assert(ancestor_state.get_id() != StateID::no_state);
     State state = convert_ancestor_state(ancestor_state);
-    assert(!lp_solver.has_temporary_constraints());
-    for (const auto &generator : constraint_generators) {
-        bool dead_end = generator->update_constraints(state, lp_solver);
-        if (dead_end) {
-            lp_solver.clear_temporary_constraints();
-            return DEAD_END;
+    int h_cache = NO_VALUE;
+    evaluations++;
+    constraint_generators[0]->set_active_state(state);
+    if (cache_lp) {
+        //cout << "get cache" << endl;
+        h_cache = constraint_generators[0]->get_cached_heuristic_value(state);
+        if (h_cache != NO_VALUE) {
+            ++cache_hits;
         }
     }
-    int result;
-    lp_solver.solve();
-    if (lp_solver.has_optimal_solution()) {
-        double epsilon = 0.01;
-        double objective_value = lp_solver.get_objective_value();
-        result = ceil(objective_value - epsilon);
+    double result = NO_VALUE;
+    if (h_cache == NO_VALUE || debug_cache) {
+        assert(!lp_solver.has_temporary_constraints());
+        for (const auto &generator : constraint_generators) {
+            bool dead_end = generator->update_constraints(state, lp_solver);
+            if (dead_end) {
+                result = DEAD_END;
+                //cout << "dead end" << endl;
+            }
+        }
+        if (result == NO_VALUE) {
+            lp_solver.solve();
+            if (lp_solver.has_optimal_solution()) {
+                //lp_solver.write_lp("debug-" + std::to_string(evaluations));
+                result = lp_solver.get_objective_value();
+                //cout << "solved lp: " << result << endl;
+                vector<double> lower_bounds(lp_solver.get_num_constraints());
+                vector<double> higher_bounds(lp_solver.get_num_constraints());
+                tie(lower_bounds, higher_bounds) = lp_solver.get_rhs_sa();
+            } else {
+                //cout << "dead end type 2" << endl;
+                result = DEAD_END;
+            }
+        }
+        if (cache_lp && h_cache == NO_VALUE) {
+            constraint_generators[0]->cache_heuristic(state, lp_solver, result);
+        }
+        //cout << "cache: " << h_cache << endl;
+        //cout << "lp: " << result << ":" << ceil(result - 0.01) << endl;
+        //debug_cache -> X
+        assert(!debug_cache || (h_cache == NO_VALUE || h_cache == ceil(result - 0.01)));
     } else {
-        result = DEAD_END;
+        result = h_cache;
     }
+    assert(result != NO_VALUE);
     lp_solver.clear_temporary_constraints();
-    return result;
+    return ceil(result - 0.01);
 }
 
 static shared_ptr<Heuristic> _parse(OptionParser &parser) {
@@ -68,7 +105,8 @@ static shared_ptr<Heuristic> _parse(OptionParser &parser) {
         "are guaranteed to have a solution with Count_o = occurrences(o, pi) "
         "for every plan pi. Minimizing the total cost of operators subject to "
         "some operator-counting constraints is an admissible heuristic. "
-        "For details, see" + utils::format_conference_reference(
+        "For details, see" +
+        utils::format_conference_reference(
             {"Florian Pommerening", "Gabriele Roeger", "Malte Helmert",
              "Blai Bonet"},
             "LP-based Heuristics for Cost-optimal Planning",
@@ -96,10 +134,17 @@ static shared_ptr<Heuristic> _parse(OptionParser &parser) {
     // TODO: prefer operators that are non-zero in the solution.
     parser.document_property("preferred operators", "no");
 
-
     parser.add_list_option<shared_ptr<ConstraintGenerator>>(
         "constraint_generators",
         "methods that generate constraints over operator-counting variables");
+
+    parser.add_option<bool>(
+        "cache_lp",
+        "try to avoid lp computations by caching previous solutions", "false");
+    parser.add_option<bool>(
+        "debug_cache",
+        "compute lps although caching is enabled and check if the cached predictions are correct",
+        "false");
 
     parser.add_option<bool>(
         "use_integer_operator_counts",

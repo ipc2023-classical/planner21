@@ -495,6 +495,25 @@ int LPSolver::get_num_constraints() const {
     }
 }
 
+vector<double> LPSolver::get_row_price() const {
+    assert(has_optimal_solution());
+    try {
+        const double *price = lp_solver->getRowPrice();
+        return vector<double> (price, price + get_num_constraints());
+    } catch (CoinError &error) {
+        handle_coin_error(error);
+    }
+}
+
+tuple<vector<double>, vector<double>> LPSolver::get_rhs_sa() const {
+    assert(has_optimal_solution());
+    try {
+        return lp::getRHSSA(lp_solver.get());
+    } catch (CoinError &error) {
+        handle_coin_error(error);
+    }
+}
+
 int LPSolver::has_temporary_constraints() const {
     return has_temporary_constraints_;
 }

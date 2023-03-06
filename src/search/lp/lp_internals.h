@@ -12,6 +12,8 @@
 #include "../utils/language.h"
 
 #include <memory>
+#include <vector>
+#include <tuple>
 
 class CoinError;
 class OsiSolverInterface;
@@ -30,6 +32,13 @@ std::unique_ptr<OsiSolverInterface> create_lp_solver(LPSolverType solver_type);
   issue983).
 */
 extern void set_mip_gap(OsiSolverInterface *lp_solver, double relative_gap);
+
+
+/*
+Acess the rhs sensitivity information from Cplex
+Doesn't work with any other solver.
+*/
+std::tuple<std::vector<double>, std::vector<double>> getRHSSA(OsiSolverInterface *lp_solver);
 
 /*
   Print the CoinError and then exit with ExitCode::SEARCH_CRITICAL_ERROR.

@@ -161,6 +161,34 @@ void set_mip_gap(OsiSolverInterface *lp_solver, double relative_gap) {
 #endif
 }
 
+tuple<vector<double>, vector<double>> getRHSSA(OsiSolverInterface *lp_solver) {
+#ifdef COIN_HAS_CPX
+    auto *cpx_solver = dynamic_cast<OsiCpxSolverInterface *>(lp_solver);
+    if (!cpx_solver) {
+        cout << "failed casting solverinterface to cpxsolver ptr" << endl;
+        utils::exit_with(ExitCode::SEARCH_CRITICAL_ERROR);
+    }
+    vector<double> b_lower(lp_solver->getNumRows());
+    vector<double> b_upper(lp_solver->getNumRows());
+    //passing vectors as c-style arrays should be safe: https://stackoverflow.com/questions/3093451/is-it-safe-to-pass-a-vector-as-an-array
+    if (lp_solver->getNumRows() > 0) { //&vector[0] produces nullpointer otherwise
+        int status = CPXrhssa(cpx_solver->getEnvironmentPtr(), cpx_solver->getLpPtr(), 0, lp_solver->getNumRows() - 1, &b_lower[0], &b_upper[0]);
+        if (status != 0) {
+            cout << "failed casting solverinterface to cpxsolver ptr" << endl;
+            utils::exit_with(ExitCode::SEARCH_CRITICAL_ERROR);
+        }
+    }
+    return make_tuple(b_lower, b_upper);
+
+#else
+    utils::unused_variable(lp_solver);
+    cout << "Acessing sensitivity analysis information without cplex is not supported" << endl;
+    utils::exit_with(ExitCode::SEARCH_CRITICAL_ERROR);
+#endif
+}
+
+
+
 NO_RETURN
 void handle_coin_error(const CoinError &error) {
     if (error.message().find(COIN_CPLEX_ERROR_OOM) != string::npos) {

@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <memory>
+#include <tuple>
 #include <vector>
 
 /*
@@ -23,6 +24,8 @@
               "to install an LP solver and use it in the planner."); \
 }
 #endif
+
+#define COMMA ,
 
 class CoinPackedVectorBase;
 class OsiSolverInterface;
@@ -193,6 +196,22 @@ public:
       solution before calling this method.
     */
     LP_METHOD(std::vector<double> extract_solution() const)
+
+    /*
+      Return the row price or dual price or shadow price or marginal value for
+      each constraint in the LP.
+      The LP has to be solved with a call to solve() and has to have an optimal
+      solution before calling this method.
+    */
+    LP_METHOD(std::vector<double> get_row_price() const)
+
+    /*
+      Sensitivity Analysis, onyl supported for Cplex for now.
+      The LP has to be solved with a call to solve() and has to have an optimal
+      solution before calling this method.
+    */
+    LP_METHOD(std::tuple<std::vector<double> COMMA std::vector<double>> get_rhs_sa() const)
+
 
     LP_METHOD(int get_num_variables() const)
     LP_METHOD(int get_num_constraints() const)

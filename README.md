@@ -1,12 +1,15 @@
 # Scorpion
 
-Scorpion is an optimal classical planner that uses saturated cost
-partitioning to combine multiple abstraction heuristics. It also contains
-implementations of many other cost partitioning algorithms over
-abstraction and landmark heuristics. Scorpion is based on the [Fast
-Downward planning system](https://github.com/aibasel/downward) (version 22.06+),
-which is described below. We regularly port the latest changes from Fast Downward
-to Scorpion and also try to port Scorpion features back to Fast Downward.
+Scorpion is a classical planning system that extends [Fast
+Downward](https://www.fast-downward.org). The main extensions are:
+
+* novel state-of-the-art algorithms for optimal classical planning
+* additional search algorithms
+* several new plugin options and utilities
+
+See [below](#differences-between-scorpion-and-fast-downward) for a detailed list
+of extensions. We regularly port the latest changes from Fast Downward to
+Scorpion and also integrate some features from Scorpion back into Fast Downward.
 
 Please use the following reference when citing Scorpion:
 Jendrik Seipp, Thomas Keller and Malte Helmert.
@@ -17,7 +20,13 @@ Journal of Artificial Intelligence Research 67, pp. 129-167. 2020.
 
 ## Instructions
 
-After installing the requirements (see below), compile the planner with
+Install the dependencies (the table below lists which versions are tested):
+
+    sudo apt install cmake g++ git make python3
+
+For plugins based on linear programming (e.g., `ocp()`, `pho()`) you need
+to [add an LP solver](https://www.fast-downward.org/LPBuildInstructions). Then
+compile the planner with
 
     ./build.py
 
@@ -26,7 +35,7 @@ and see the available options with
     ./fast-downward.py --help  # driver
     ./fast-downward.py --search -- --help  # search component
 
-For more details (including build instructions for Windows), see the
+For more details (including build instructions for macOS and Windows), see the
 documentation about
 [compiling](https://www.fast-downward.org/ObtainingAndRunningFastDownward)
 and [running](https://www.fast-downward.org/PlannerUsage) the planner. The
@@ -67,18 +76,17 @@ abstractions](https://jair.org/index.php/jair/article/view/11217).
 component_options=[], driver_options=["--transform-task", "preprocess-h2",
 "--alias", "scorpion"]` to run the recommended Scorpion configuration.)
 
-#### Singularity container
+#### Apptainer image
 
 To simplify the installation process, we provide an executable
-[Singularity](https://github.com/hpcng/singularity) container for
-Scorpion. It accepts the same arguments as the `fast-downward.py` script
-(see above).
+[Apptainer](https://apptainer.org/) container (formerly known as Singularity).
+It accepts the same arguments as the `fast-downward.py` script (see above).
 
-    # Download the container (tested with Singularity 3.5),
-    singularity pull scorpion.sif library://jendrikseipp/default/scorpion:latest
+    # Download the image,
+    apptainer pull scorpion.sif oras://ghcr.io/jendrikseipp/scorpion:latest
 
-    # or build the container yourself.
-    sudo singularity build scorpion.sif Singularity
+    # or build it yourself.
+    apptainer build scorpion.sif Apptainer
 
     # Then run recommended configuration (available via "scorpion" alias).
     ./scorpion.sif --transform-task preprocess-h2 --alias scorpion PROBLEM_FILE
@@ -247,10 +255,11 @@ This version of Fast Downward has been tested with the following software versio
 
 | OS           | Python | C++ compiler                                                     | CMake |
 | ------------ | ------ | ---------------------------------------------------------------- | ----- |
+| Ubuntu 22.04 | 3.10   | GCC 11, GCC 12, Clang 14                                         | 3.22  |
 | Ubuntu 20.04 | 3.8    | GCC 9, GCC 10, Clang 10, Clang 11                                | 3.16  |
-| Ubuntu 18.04 | 3.6    | GCC 7, Clang 6                                                   | 3.10  |
-| macOS 10.15  | 3.6    | AppleClang 12                                                    | 3.19  |
-| Windows 10   | 3.6    | Visual Studio Enterprise 2019 (MSVC 19.29) and 2022 (MSVC 19.31) | 3.22  |
+| macOS 12     | 3.10   | AppleClang 14                                                    | 3.24  |
+| macOS 11     | 3.8    | AppleClang 13                                                    | 3.24  |
+| Windows 10   | 3.8    | Visual Studio Enterprise 2019 (MSVC 19.29) and 2022 (MSVC 19.31) | 3.22  |
 
 We test LP support with CPLEX 12.9, SoPlex 3.1.1 and Osi 0.107.9.
 On Ubuntu, we test both CPLEX and SoPlex. On Windows, we currently
@@ -273,11 +282,11 @@ contributing, and finally by last name.
 - 2010-2011, 2013-2022 Silvan Sievers
 - 2012-2022 Florian Pommerening
 - 2013, 2015-2022 Salomé Eriksson
+- 2015, 2021-2022 Thomas Keller
 - 2018-2022 Patrick Ferber
 - 2021-2022 Clemens Büchner
 - 2021-2022 Dominik Drexler
 - 2022 Remo Christen
-- 2015, 2021 Thomas Keller
 - 2016-2020 Cedric Geissmann
 - 2017-2020 Guillem Francès
 - 2018-2020 Augusto B. Corrêa
