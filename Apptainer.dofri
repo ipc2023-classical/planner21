@@ -4,16 +4,23 @@ From: ubuntu:kinetic
 Stage: build
 
 %files
-    .
+    src 
+    driver
+    build_configs.py
+    build.py
+    fast-downward.py
 
 %post
     ## Install all necessary dependencies.
     apt-get update
-    apt-get -y install cmake python3 make g++
+    apt-get -y install --no-install-recommends cmake python3 make g++ pypy3
 
+    ## Clear local build directories.
+    rm -rf /builds
+    
     ## Build the planner
-    ./build.py -j4
-    strip --strip-all builds/release/bin/downward
+    pypy3 build.py
+    strip --strip-all builds/release/bin/downward builds/release/bin/preprocess-h2
 
 
 # Stage 2: Run the planner
@@ -30,7 +37,8 @@ Stage: run
 %post
     ## Install only dependencies for running the planner.
     apt-get update
-    apt-get -y install python3-minimal
+    apt-get -y install --no-install-recommends pypy3
+    apt-get clean
     ## Remove unnecessary files to keep the image small.
     rm -rf /var/lib/apt/lists/*
 
@@ -41,22 +49,22 @@ Stage: run
     PROBLEMFILE="$2"
     PLANFILE="$3"
 
-    /fast-downward.py \
+    pypy3 /fast-downward.py \
         --plan-file "$PLANFILE" \
         "$DOMAINFILE" \
         "$PROBLEMFILE" \
-        --search "astar(lmcut())"
+        --search "astar(operatorcounting([pho_abstraction_constraints([projections(sys_scp(max_time=100,max_time_per_restart=10)),cartesian()],strategy=max_cluster)],cache_lp=true))"
 
 ## Define meta data
 %labels
-Name        demo A* with LM-cut
-Description forward search with A* and the LM-cut heuristic (only for demo purposes)
-Authors     Florian Pommerening <florian.pommerening@unibas.ch>
+Name        SPhO with selective LP recalculation
+Description forward search with A* and the Saturated Post-Hoc optimization heuristic that selectively reuses previous SPhO LP solutions.
+Authors     Paul Höft <paul.hoft@liu.se>, Jendrik Seipp <jendrik.seipp@liu.se>, David Speck <david.speck@liu.se>
 License     GPL 3
 Tracks      optimal
 SupportsDerivedPredicates                       no
-SupportsUniversallyQuantifiedPreconditions      yes
-SupportsExistentiallyQuantifiedPreconditions    partially, only quantification over static predicates (demo example of a description of partial support)
+SupportsUniversallyQuantifiedPreconditions      no
+SupportsExistentiallyQuantifiedPreconditions    no
 SupportsUniversallyQuantifiedEffects            yes
 SupportsNegativePreconditions                   yes
 SupportsEqualityPreconditions                   yes
