@@ -8,16 +8,42 @@ Stage: build
     driver
     build_configs.py
     build.py
-    fast-downward.py
+    fast-downward.py    
+    ILOG_COS_20.10_LINUX_X86_64.bin
+    Osi-0.107.9.tgz
 
 %post
     ## Install all necessary dependencies.
     apt-get update
-    apt-get -y install --no-install-recommends cmake python3 make g++ pypy3
+    apt-get -y install --no-install-recommends cmake make g++ pypy3 default-jre-headless zlib1g-dev
 
     ## Clear local build directories.
     rm -rf /builds
     
+    ## Build CPLEX
+    ./ILOG_COS_20.10_LINUX_X86_64.bin -DLICENSE_ACCEPTED=TRUE -i silent
+   
+    export DOWNWARD_CPLEX_ROOT=/opt/ibm/ILOG/CPLEX_Studio201/cplex/
+
+    ##Build OSI
+    tar xvzf Osi-0.107.9.tgz
+    cd Osi-0.107.9
+    export DOWNWARD_COIN_ROOT=/opt/coin/
+    
+    ./configure CC="gcc"  CFLAGS="-pthread -Wno-long-long" \
+            CXX="g++" CXXFLAGS="-pthread -Wno-long-long" \
+            LDFLAGS="-L$DOWNWARD_CPLEX_ROOT/lib/x86-64_linux/static_pic" \
+            --without-lapack --enable-static=yes \
+            --prefix="$DOWNWARD_COIN_ROOT" \
+            --disable-bzlib  \
+            --with-cplex-incdir=$DOWNWARD_CPLEX_ROOT/include/ilcplex \
+            --with-cplex-lib="-lcplex -lm -ldl"
+            
+    make
+    make install
+    
+    cd ..
+
     ## Build the planner
     pypy3 build.py
     strip --strip-all builds/release/bin/downward builds/release/bin/preprocess-h2
@@ -33,11 +59,13 @@ Stage: run
     fast-downward.py
     builds/release/bin/
     driver
+    /opt/ibm/ILOG/CPLEX_Studio201/cplex/
+    /opt/coin/
 
 %post
     ## Install only dependencies for running the planner.
     apt-get update
-    apt-get -y install --no-install-recommends pypy3
+    apt-get -y install --no-install-recommends pypy3 zlib1g-dev
     apt-get clean
     ## Remove unnecessary files to keep the image small.
     rm -rf /var/lib/apt/lists/*
@@ -57,7 +85,7 @@ Stage: run
 
 ## Define meta data
 %labels
-Name        SPhO with selective LP recalculation
+Name        Dofri
 Description forward search with A* and the Saturated Post-Hoc optimization heuristic that selectively reuses previous SPhO LP solutions.
 Authors     Paul Höft <paul.hoft@liu.se>, Jendrik Seipp <jendrik.seipp@liu.se>, David Speck <david.speck@liu.se>
 License     GPL 3
