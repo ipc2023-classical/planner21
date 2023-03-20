@@ -9,8 +9,8 @@ Stage: build
     build_configs.py
     build.py
     fast-downward.py    
-    ILOG_COS_20.10_LINUX_X86_64.bin
-    Osi-0.107.9.tgz
+    $IPC_THIRD_PARTY/ILOG_COS_20.10_LINUX_X86_64.bin ILOG_COS_20.10_LINUX_X86_64.bin
+    $IPC_THIRD_PARTY/Osi-0.107.9.tgz Osi-0.107.9.tgz
 
 %post
     ## Install all necessary dependencies.

@@ -18,11 +18,11 @@
 using namespace std;
 
 namespace operator_counting {
-SenseCache::SenseCache(vector<int> current, vector<double> lower, vector<double> higher, vector<double>shadow_prices, double h)
+SenseCache::SenseCache(vector<int> &&current, vector<double> &&lower, vector<double> &&higher, vector<double> &&shadow_prices, double h)
     : lower(lower), higher(higher), current(current), shadow_prices(shadow_prices), h(h) {
 }
 
-int SenseCache::range_check(vector<int> values) const {
+int SenseCache::range_check(const vector<int> &values) const {
     assert(values.size() == current.size());
     bool change = false;
     double h_value_change = 0;
@@ -57,7 +57,7 @@ int SenseCache::range_check(vector<int> values) const {
     return cached_h;
 }
 
-int SenseCache::percent_check(vector<int> values) const {
+int SenseCache::percent_check(const vector<int> &values) const {
     assert(values.size() == current.size());
     double changed_percentage = 0;
     double h_value_change = 0;
@@ -114,11 +114,14 @@ PhOAbstractionConstraints::PhOAbstractionConstraints(const Options &opts)
       num_empty_constraints(0),
       num_duplicate_constraints(0),
       num_constraints(0),
+      //lookups(0),
       active_state_id(StateID::no_state) {}
 
 PhOAbstractionConstraints::~PhOAbstractionConstraints() {
     if (strategy == RecomputationStrategy::RANGE_SA || strategy == RecomputationStrategy::PERCENT_SA) {
         cout << "cache size: " << rangeCache.size() << endl;
+        //cout << "cache_hits: " << cache_hits << endl;
+        //cout << "lookups: " << lookups << endl;
         //for (SenseCache &elem:rangeCache) {
         //    cout << elem << endl;
         //}
@@ -233,7 +236,7 @@ void PhOAbstractionConstraints::initialize_constraints(
         cout << "None of the provided abstractions were useful. Heuristic will be 0 everywhere" << endl;
     }
 
-    if (strategy == RecomputationStrategy::TUPLE) {
+    if (strategy == RecomputationStrategy::TUPLE || strategy == RecomputationStrategy::ALWAYS) {
         num_constraints = abstractions.size() - num_empty_constraints;
     } else {
         assert(cf_clusters.size() == (abstractions.size() - num_empty_constraints - num_duplicate_constraints));
@@ -250,9 +253,8 @@ void PhOAbstractionConstraints::initialize_constraints(
     fill(DEAD_END_TUPLE.begin(), DEAD_END_TUPLE.end(), -1);
     if (constraints.size() > 0) {
         cache[distance_tuple] = 0; //add goal state cache
-        vector<double> dummy(num_constraints);
-        vector<int> agd(num_constraints);
-        rangeCache.push_back(SenseCache(agd, dummy, dummy, dummy, 0));
+        rangeCache.push_back(SenseCache(vector<int>(num_constraints), vector<double>(num_constraints), vector<double>(num_constraints), vector<double>(num_constraints), 0));
+        //cache_hits.push_back(0);
     }
     //cout << "setup finished" << endl;
 }
@@ -377,20 +379,21 @@ void PhOAbstractionConstraints::cache_heuristic(const State &state, lp::LPSolver
         if (h == -1) {
             vector<double> lower_bounds(num_constraints);
             vector<double> higher_bounds(num_constraints);
-            vector<int> agd = state_to_tuple(state);
             vector<double> shadow_prices(num_constraints);
-            rangeCache.push_back(SenseCache(agd, lower_bounds, higher_bounds, shadow_prices, h));
+            rangeCache.push_back(SenseCache(state_to_tuple(state), move(lower_bounds), move(higher_bounds), move(shadow_prices), h));
+            //cache_hits.push_back(0);
         } else {
             vector<double> lower_bounds(num_constraints);
             vector<double> higher_bounds(num_constraints);
             tie(lower_bounds, higher_bounds) = lp_solver.get_rhs_sa();
-            vector<int> agd = state_to_tuple(state);
             vector<double> shadow_prices = lp_solver.get_row_price();
             //cout << "caching: " << agd << endl;
             //cout << "lower: " << lower_bounds << endl;
             //cout << "higher: " << higher_bounds << endl;
-            rangeCache.push_back(SenseCache(agd, lower_bounds, higher_bounds, shadow_prices, h));
+            rangeCache.push_back(SenseCache(state_to_tuple(state), move(lower_bounds), move(higher_bounds), move(shadow_prices), h));
+            //cache_hits.push_back(0);
         }
+        //assert(rangeCache.size() == cache_hits.size());
     }
 }
 
@@ -408,27 +411,33 @@ int PhOAbstractionConstraints::get_cached_heuristic_value(const State &state) {
     //cout << endl;
     //cout << constraint_ids_by_abstraction << endl;
     if (strategy == RecomputationStrategy::RANGE_SA) {
-        int i = 0;
-        for (SenseCache cache: rangeCache) {
-            int cache_h = cache.range_check(distance_tuple);
+        for (int i = rangeCache.size() - 1; i >= 0; i--) {
+            int cache_h = rangeCache[i].range_check(distance_tuple);
             if (cache_h != -2) {
                 //cout << "found cache hit: " << cache_h << endl;
-                //cout << "looked throught " << i << " of " << rangeCache.size() << " cache entries" << endl;
+                //assert(utils::in_bounds(i, cache_hits));
+                //cache_hits[i]++;
+                //approximate max-heap by sifting used rule up. Reduces the time spend looping over all rules.
+                swap(rangeCache[i], rangeCache[(rangeCache.size() + i - 1) / 2]);
                 return cache_h;
             }
-            i++;
+            //lookups++;
         }
         //cout << "no cache hit" << endl;
         return -2;
     }
     if (strategy == RecomputationStrategy::PERCENT_SA) {
         //cout << "percentage lookup in " << rangeCache.size() << " cache entries" << endl;
-        for (SenseCache cache: rangeCache) {
-            int cache_h = cache.percent_check(distance_tuple);
+        for (int i = rangeCache.size() - 1; i >= 0; i--) {
+            int cache_h = rangeCache[i].percent_check(distance_tuple);
             if (cache_h != -2) {
                 //cout << "found cache hit: " << cache_h << endl;
+                //assert(utils::in_bounds(i, cache_hits));
+                //cache_hits[i]++;
+                swap(rangeCache[i], rangeCache[(rangeCache.size() + i - 1) / 2]);
                 return cache_h;
             }
+            //lookups++;
         }
         //cout << "no cache hit" << endl;
         return -2;
@@ -436,7 +445,7 @@ int PhOAbstractionConstraints::get_cached_heuristic_value(const State &state) {
     auto it = cache.find(distance_tuple);
     if (it == cache.end()) {
         // return NO_VALUE;
-        return -2;         // see comment in parent function
+        return -2; // see comment in parent function
     }
     return it->second;
 }
