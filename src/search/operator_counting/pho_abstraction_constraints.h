@@ -75,10 +75,9 @@ public:
     virtual void set_active_state(const State &state) override;
 
     std::vector<int> distance_tuple;
-    std::vector<int> DEAD_END_TUPLE;
 
 private:
-    std::vector<int> state_to_tuple(const State &state);
+    void set_distance_tuple(const State &state);
 };
 }
 
