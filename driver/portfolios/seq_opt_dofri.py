@@ -29,7 +29,7 @@ if has_conditional_effects(SAS_FILE):
 else:
     ABSTRACTIONS = (
         "[projections(sys_scp(max_time=200,"
-        " max_time_per_restart=10)),cartesian(max_time=20,verbosity=silent)]"
+        " max_time_per_restart=10)),cartesian(max_time=200,verbosity=silent)]"
     )
 
 
