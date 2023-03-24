@@ -4,6 +4,6 @@ __pycache__/
 /sas_plan.*
 /builds/
 /experiments/.venv/
-/experiments/xdata/
+/experiments/data/
 /misc/.tox/
 /misc/autodoc/downward-xmlrpc.secret
