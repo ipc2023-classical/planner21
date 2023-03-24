@@ -94,8 +94,8 @@ Authors     Paul Höft <paul.hoft@liu.se>, Jendrik Seipp <jendrik.seipp@liu.se>,
 License     GPL 3
 Tracks      optimal
 SupportsDerivedPredicates                       no
-SupportsUniversallyQuantifiedPreconditions      no
-SupportsExistentiallyQuantifiedPreconditions    no
+SupportsUniversallyQuantifiedPreconditions      yes
+SupportsExistentiallyQuantifiedPreconditions    yes
 SupportsUniversallyQuantifiedEffects            yes
 SupportsNegativePreconditions                   yes
 SupportsEqualityPreconditions                   yes
