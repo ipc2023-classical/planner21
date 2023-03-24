@@ -45,7 +45,7 @@ Stage: build
     cd ..
 
     ## Build the planner
-    ./build.py
+    ./build.py -j4
     strip --strip-all builds/release/bin/downward builds/release/bin/preprocess-h2
 
 
@@ -79,7 +79,7 @@ Stage: run
     PLANFILE="$3"
 
     /fast-downward.py \
-        --overall-time-limit 10m \
+        --overall-time-limit 30m \
         --transform-task /builds/release/bin/preprocess-h2 \
         --plan-file "$PLANFILE" \
         --alias seq-opt-dofri \
