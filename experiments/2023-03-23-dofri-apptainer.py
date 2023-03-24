@@ -54,6 +54,12 @@ image = project.get_repo_base() / "Dofri"
 exp.add_resource("dofri", image, symlink=True)
 exp.add_resource("", "common_parser.py")
 
+def get_run_command():
+    command = ["{dofri}", "{domain}", "{problem}", "planfile.out"]
+    if project.REMOTE:
+        commmand = ["apptainer","run","--bind",project.get_repo_base()] + command
+    return command
+
 
 for task in SUITE:
     run = exp.add_run()
@@ -61,7 +67,7 @@ for task in SUITE:
     run.add_resource("problem", task.problem_file)
     run.add_command(
         "planner",
-        ["{dofri}", "{domain}", "{problem}", "planfile.out"],
+        get_run_command(),
         memory_limit=MEMORY_LIMIT,
     )
     run.set_property("algorithm", "dofri")
