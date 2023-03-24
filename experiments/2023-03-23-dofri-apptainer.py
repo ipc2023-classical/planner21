@@ -23,7 +23,7 @@ if project.REMOTE:
     MIN = 15
     TIME_LIMIT = int(HOURS * 60 + MIN)
     MEMORY_LIMIT = 8000
-    SUITE = build_suite(project.SAS_BENCHMARK_DIR, project.SUITE_TEST)
+    SUITE = build_suite(project.PDDL_BENCHMARK_DIR, project.SUITE_TEST)
 else:
     ENV = LocalEnvironment(processes=5)
     HOURS = 0
