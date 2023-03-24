@@ -74,9 +74,6 @@ int OperatorCountingHeuristic::compute_heuristic(const State &ancestor_state) {
                 //lp_solver.write_lp("debug-" + std::to_string(evaluations));
                 result = lp_solver.get_objective_value();
                 //cout << "solved lp: " << result << endl;
-                vector<double> lower_bounds(lp_solver.get_num_constraints());
-                vector<double> higher_bounds(lp_solver.get_num_constraints());
-                tie(lower_bounds, higher_bounds) = lp_solver.get_rhs_sa();
             } else {
                 //cout << "dead end type 2" << endl;
                 result = DEAD_END;

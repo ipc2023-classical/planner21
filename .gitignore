@@ -3,7 +3,7 @@ __pycache__/
 /sas_plan
 /sas_plan.*
 /builds/
-/experiments/*/.venv/
-/experiments/*/data/
+/experiments/.venv/
+/experiments/xdata/
 /misc/.tox/
 /misc/autodoc/downward-xmlrpc.secret

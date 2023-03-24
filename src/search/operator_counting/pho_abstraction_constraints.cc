@@ -18,26 +18,32 @@
 using namespace std;
 
 namespace operator_counting {
-SenseCache::SenseCache(vector<int> &&current, vector<double> &&lower, vector<double> &&higher, vector<double> &&shadow_prices, double h)
-    : lower(lower), higher(higher), current(current), shadow_prices(shadow_prices), h(h) {
+SenseInterval::SenseInterval(double lower, double higher, int current, double shadow_price) : lower(lower), higher(higher), current(current), shadow_price(shadow_price) {}
+
+SenseEntry::SenseEntry(vector<int> &&current, vector<double> &&lower, vector<double> &&higher, vector<double> &&shadow_prices, double h) : h(h) {
+    intervalls.reserve(current.size());
+    for (int i = 0; i < current.size(); i++) {
+        intervalls.push_back(SenseInterval(lower[i], higher[i], current[i], shadow_prices[i]));
+    }
 }
 
-int SenseCache::range_check(const vector<int> &values) const {
-    assert(values.size() == current.size());
+int SenseEntry::range_check(const vector<int> &values) const {
+    assert(values.size() == intervalls.size());
     bool change = false;
     double h_value_change = 0;
     //cout << "check: " << values << endl;
     //cout << "agains: " << endl;
     for (size_t i = 0; i < values.size(); i++) {
+        const SenseInterval &iv = intervalls[i];
         //cout << values[i] << ":" << "[" << lower[i] << ":" << current[i] << ":" << higher[i] << "]:" << shadow_prices[i] << endl;
-        if (current[i] != values[i]) {
-            if (change || values[i] < lower[i] || higher[i] < values[i]) {
+        if (iv.current != values[i]) {
+            if (change || values[i] < iv.lower || iv.higher < values[i]) {
                 //cout << "out of range or second change, stopping" << endl;
                 return -2;
             }
             //cout << "in range" << endl;
             change = true;
-            h_value_change = (values[i] - current[i]) * shadow_prices[i];
+            h_value_change = (values[i] - iv.current) * iv.shadow_price;
         }// else {
          //cout << "same" << endl;
          //}
@@ -52,25 +58,26 @@ int SenseCache::range_check(const vector<int> &values) const {
     return cached_h;
 }
 
-int SenseCache::percent_check(const vector<int> &values) const {
-    assert(values.size() == current.size());
+int SenseEntry::percent_check(const vector<int> &values) const {
+    assert(values.size() == intervalls.size());
     double changed_percentage = 0;
     double h_value_change = 0;
     //cout << "check: " << values << endl;
     //cout << "agains: " << endl;
     for (size_t i = 0; i < values.size(); i++) {
+        const SenseInterval &iv = intervalls[i];
         //cout << values[i] << ":" << "[" << lower[i] << ":" << current[i] << ":" << higher[i] << "]:" << shadow_prices[i] << endl;
-        if (current[i] != values[i]) {
-            if (values[i] < lower[i] || higher[i] < values[i]) {
+        if (iv.current != values[i]) {
+            if (values[i] < iv.lower || iv.higher < values[i]) {
                 //cout << "out of range, stopping" << endl;
                 return -2;
             }
-            if (values[i] < current[i] && lower[i] > -cost_saturation::INF) {
-                changed_percentage += (values[i] - current[i]) / (lower[i] - current[i]);
-            } else if (values[i] > current[i] && higher[i] < cost_saturation::INF) {
-                changed_percentage += (values[i] - current[i]) / (higher[i] - current[i]);
+            if (values[i] < iv.current && iv.lower > -cost_saturation::INF) {
+                changed_percentage += (values[i] - iv.current) / (iv.lower - iv.current);
+            } else if (values[i] > iv.current && iv.higher < cost_saturation::INF) {
+                changed_percentage += (values[i] - iv.current) / (iv.higher - iv.current);
             }
-            h_value_change += (values[i] - current[i]) * shadow_prices[i];
+            h_value_change += (values[i] - iv.current) * iv.shadow_price;
             //cout << "in range, change percent: " << changed_percentage << endl;
             if (changed_percentage > 1.0) {
                 //cout << "over 100%" << endl;
@@ -89,11 +96,14 @@ int SenseCache::percent_check(const vector<int> &values) const {
     return cached_h;
 }
 
-ostream &operator<<(ostream &os, const SenseCache &cache) {
-    os << cache.lower << endl;
-    os << cache.current << endl;
-    os << cache.higher << endl;
-    os << cache.shadow_prices << endl;
+ostream &operator<<(ostream &os, const SenseInterval &interval) {
+    os << interval.lower << "<=" << interval.current << "<=" << interval.higher << ":" << interval.shadow_price;
+}
+
+ostream &operator<<(ostream &os, const SenseEntry &cache) {
+    for (const SenseInterval &iv: cache.intervalls) {
+        os << iv << endl;
+    }
     os << cache.h << endl;
     return os;
 }
@@ -112,7 +122,7 @@ PhOAbstractionConstraints::PhOAbstractionConstraints(const Options &opts)
 
 PhOAbstractionConstraints::~PhOAbstractionConstraints() {
     if (strategy == RecomputationStrategy::RANGE_SA || strategy == RecomputationStrategy::PERCENT_SA) {
-        cout << "cache size: " << rangeCache.size() << endl;
+        cout << "cache size: " << senseCache.size() << endl;
         //cout << "cache_hits: " << cache_hits << endl;
         //cout << "lookups: " << lookups << endl;
         //for (SenseCache &elem:rangeCache) {
@@ -218,7 +228,7 @@ void PhOAbstractionConstraints::initialize_constraints(
     }
     if (strategy == RecomputationStrategy::MAX_CLUSTER) {
         cout << "heuristic clusters: " << cf_clusters.size() << ":" << constraint_ids_by_abstraction << endl;
-        assert(*max_element(constraint_ids_by_abstraction.begin(), constraint_ids_by_abstraction.end()) + 1 == cf_clusters.size());
+        assert(cf_clusters.size() == 0 || *max_element(constraint_ids_by_abstraction.begin(), constraint_ids_by_abstraction.end()) + 1 == cf_clusters.size());
     }
     //cout << h_values_by_abstraction << endl;
     cout << "Empty constraints: " << num_empty_constraints << endl;
@@ -246,7 +256,7 @@ void PhOAbstractionConstraints::initialize_constraints(
         //preadd a 0 heuristic cache for states in which all abstract goal states are 0, because it is unnecessary to compute an LP in these states.
         cache[distance_tuple] = 0;
         //same for Sensitivity with 0 interval and 0 shadow cost.
-        rangeCache.push_back(SenseCache(vector<int>(num_constraints), vector<double>(num_constraints), vector<double>(num_constraints), vector<double>(num_constraints), 0));
+        senseCache.push_back(SenseEntry(vector<int>(num_constraints), vector<double>(num_constraints), vector<double>(num_constraints), vector<double>(num_constraints), 0));
         //cache_hits.push_back(0);
     }
     //cout << "setup finished" << endl;
@@ -370,7 +380,7 @@ void PhOAbstractionConstraints::cache_heuristic(const State &state, lp::LPSolver
         vector<double> shadow_prices = lp_solver.get_row_price();
         //cout << "lower: " << lower_bounds << endl;
         //cout << "higher: " << higher_bounds << endl;
-        rangeCache.push_back(SenseCache(vector<int>(distance_tuple), move(lower_bounds), move(higher_bounds), move(shadow_prices), h));
+        senseCache.push_back(SenseEntry(vector<int>(distance_tuple), move(lower_bounds), move(higher_bounds), move(shadow_prices), h));
         //cache_hits.push_back(0);
         //assert(rangeCache.size() == cache_hits.size());
     }
@@ -395,15 +405,15 @@ int PhOAbstractionConstraints::get_cached_heuristic_value(const State &state) {
         }
     }
     if (strategy == RecomputationStrategy::RANGE_SA) {
-        for (int i = rangeCache.size() - 1; i >= 0; i--) {
-            int cache_h = rangeCache[i].range_check(distance_tuple);
+        for (int i = senseCache.size() - 1; i >= 0; i--) {
+            int cache_h = senseCache[i].range_check(distance_tuple);
             if (cache_h != -2) {
                 //cout << "found cache hit: " << cache_h << endl;
                 //assert(utils::in_bounds(i, cache_hits));
                 //cache_hits[i]++;
                 //approximate max-heap by sifting used rule up. Reduces the time spend looping over all rules.
                 //cout << "swap " << rangeCache.size() - i << "/" << rangeCache.size() << " up" << endl;
-                swap(rangeCache[i], rangeCache[(rangeCache.size() + i - 1) / 2]);
+                swap(senseCache[i], senseCache[(senseCache.size() + i - 1) / 2]);
                 return cache_h;
             }
             //lookups++;
@@ -413,13 +423,13 @@ int PhOAbstractionConstraints::get_cached_heuristic_value(const State &state) {
     }
     if (strategy == RecomputationStrategy::PERCENT_SA) {
         //cout << "percentage lookup in " << rangeCache.size() << " cache entries" << endl;
-        for (int i = rangeCache.size() - 1; i >= 0; i--) {
-            int cache_h = rangeCache[i].percent_check(distance_tuple);
+        for (int i = senseCache.size() - 1; i >= 0; i--) {
+            int cache_h = senseCache[i].percent_check(distance_tuple);
             if (cache_h != -2) {
                 //cout << "found cache hit: " << cache_h << endl;
                 //assert(utils::in_bounds(i, cache_hits));
                 //cache_hits[i]++;
-                swap(rangeCache[i], rangeCache[(rangeCache.size() + i - 1) / 2]);
+                swap(senseCache[i], senseCache[(senseCache.size() + i - 1) / 2]);
                 return cache_h;
             }
             //lookups++;

@@ -21,21 +21,28 @@ enum class RecomputationStrategy {
     ALWAYS, TUPLE, MAX_CLUSTER, RANGE_SA, PERCENT_SA
 };
 
-struct SenseCache {
-    std::vector<double> lower;
-    std::vector<double> higher;
-    std::vector<int> current;
-    std::vector<double> shadow_prices;
+struct SenseInterval {
+    double lower;
+    double higher;
+    int current;
+    double shadow_price;
+
+    SenseInterval(double lower, double higher, int current, double shadow_price);
+};
+
+struct SenseEntry {
+    std::vector<SenseInterval> intervalls;
     double h;
 
-    SenseCache(std::vector<int> &&current, std::vector<double> &&lower, std::vector<double> &&higher, std::vector<double> &&shadow_prices, double h);
+    SenseEntry(std::vector<int> &&current, std::vector<double> &&lower, std::vector<double> &&higher, std::vector<double> &&shadow_prices, double h);
 
     int range_check(const std::vector<int> &values) const;
 
     int percent_check(const std::vector<int> &values) const;
 };
 
-std::ostream &operator<<(std::ostream &os, const SenseCache &cache);
+std::ostream &operator<<(std::ostream &os, const SenseInterval &cache);
+std::ostream &operator<<(std::ostream &os, const SenseEntry &cache);
 
 
 class PhOAbstractionConstraints : public ConstraintGenerator {
@@ -55,7 +62,7 @@ class PhOAbstractionConstraints : public ConstraintGenerator {
     utils::HashMap<std::vector<int>, int> cf_clusters;
     utils::HashMap<std::vector<int>, int> cache;
     std::vector<int> abstract_state_ids;
-    std::vector<SenseCache> rangeCache;
+    std::vector<SenseEntry> senseCache;
     //std::vector<int> cache_hits;
 
     const double epsilon = 0.01;
