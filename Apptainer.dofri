@@ -90,7 +90,7 @@ Stage: run
 %labels
 Name        Dofri
 Description forward search with A* and the Saturated Post-Hoc optimization heuristic that selectively reuses previous SPhO LP solutions.
-Authors     Paul Höft <paul.hoft@liu.se>, Jendrik Seipp <jendrik.seipp@liu.se>, David Speck <david.speck@liu.se>
+Authors     Paul Höft <paul.hoft@liu.se>, David Speck <david.speck@liu.se>, Jendrik Seipp <jendrik.seipp@liu.se>
 License     GPL 3
 Tracks      optimal
 SupportsDerivedPredicates                       no
